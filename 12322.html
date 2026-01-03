@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Course Buddy</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Babel for JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700;900&family=Urbanist:ital,wght@0,400;0,700;0,900;1,900&display=swap" rel="stylesheet">
+    <!-- Lucide Icons Styling -->
+    <style>
+        body { background-color: #0f172a; } /* Prevent white flash */
+        /* Hide scrollbar */
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        /* Animations */
+        .animate-spin-slow { animation: spin 15s linear infinite; }
+        .animate-pop { animation: pop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        .animate-fade-in { animation: fadeIn 0.3s ease-out; }
+        .diagonal-lines { background-image: repeating-linear-gradient(45deg, transparent, transparent 5px, rgba(0,0,0,0.1) 5px, rgba(0,0,0,0.1) 10px); }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes pop { 0% { transform: scale(0.9); } 100% { transform: scale(1); } }
+    </style>
+    
+    <!-- Import Map for React & Lucide -->
+    <script type="importmap">
+    {
+      "imports": {
+        "react": "https://esm.sh/react@18.2.0",
+        "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+        "lucide-react": "https://esm.sh/lucide-react@0.263.1"
+      }
+    }
+    </script>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel" data-type="module">
+        import React, { useState, useEffect } from "react";
+        import { createRoot } from "react-dom/client";
+        import {
+          BookOpen, Users, User, Search, Bell, Filter, Plus, ChevronLeft, Send,
+          Clock, Target, MapPin, FileText, ChevronRight, Play, Pause, Settings,
+          CheckSquare, Zap, ArrowRight, MessageCircle, Star, X, Calendar, Check,
+          AlertCircle, Download, Sparkles, Loader2
+        } from "lucide-react";
+
+        const apiKey = ""; // API Key placeholder
+
+        // --- Data ---
+        const CURRENT_USER = {
+          id: "u1", name: "SCHOLAR", school: "秀尽学院 · 数媒系",
+          avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Felix",
+          tags: ["考研党", "图书馆钉子户", "求过"],
+          stats: { focusTime: 1240, tasks: 15, reliability: 98 }, verified: true,
+        };
+
+        const COURSES = [
+          { id: "c1", name: "交互设计原理", time: "08:00", location: "设计楼 A301", day: "MON", theme: "bg-black text-white" },
+          { id: "c2", name: "Web前端开发", time: "10:00", location: "计算中心 204", day: "TUE", theme: "bg-white text-black" },
+          { id: "c3", name: "高等数学(下)", time: "14:00", location: "一教 101", day: "WED", theme: "bg-blue-600 text-white" },
+          { id: "c4", name: "大学英语(IV)", time: "08:00", location: "外语楼 305", day: "THU", theme: "bg-yellow-400 text-black" },
+        ];
+
+        const NOTIFICATIONS = [
+          { id: 1, type: "system", title: "MISSION START", content: "学生身份认证通过。", time: "2小时前", read: false },
+          { id: 2, type: "invite", title: "INVITATION", content: "李想邀请你加入“前端开发期末项目组”。", time: "1天前", read: true },
+          { id: 3, type: "alert", title: "DEADLINE", content: "《交互设计》作业需在明日提交。", time: "3天前", read: true },
+        ];
+
+        const CHATS = [
+          { id: "chat1", userId: "b1", name: "SKULL", major: "计算机", interests: "React, 游戏", lastMsg: "作业那个部分你看了吗？", time: "10:23", unread: 2, avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Aneka" },
+          { id: "chat2", userId: "b2", name: "FOX", major: "美术", interests: "素描, 展览", lastMsg: "明天图书馆见！", time: "昨天", unread: 0, avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Baby" },
+        ];
+        
+        const CHAT_HISTORY = [
+          { id: 1, sender: "them", text: "Hey! 也是选了前端课的吗？", time: "10:20" },
+          { id: 2, sender: "me", text: "没错，正在找队友。", time: "10:21" },
+          { id: 3, sender: "them", text: "Great! 要不要一起组队？", time: "10:23" },
+        ];
+
+        const BUDDY_RECOMMENDATIONS = [
+          { id: "b1", name: "MORGANA", major: "计算机科学", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Aneka", matchScore: 99, commonCourses: ["Web前端", "高数"], category: "开发", style: "ACADEMIC", desc: "React熟手，求靠谱队友！", isOnline: true },
+          { id: "b2", name: "PANTHER", major: "数字媒体", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Baby", matchScore: 85, commonCourses: ["交互设计"], category: "设计", style: "SOCIAL", desc: "正在做用户调研，求搭子一起去食堂采访。", isOnline: false },
+          { id: "b3", name: "FOX", major: "数学系", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Caleb", matchScore: 92, commonCourses: ["高数"], category: "高数", style: "SILENT", desc: "单纯想找个人在图书馆对面坐着，不说话。", isOnline: true },
+          { id: "b4", name: "QUEEN", major: "法律系", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Jocelyn", matchScore: 80, commonCourses: [], category: "自习", style: "STRICT", desc: "考公复习中，迟到一次契约终止。", isOnline: false },
+        ];
+
+        const GROUPS = [
+          { id: "g1", title: "前端开发小组", course: "Web Dev", members: 3, maxMembers: 5, tags: ["开发"], lastMsg: "UI设计图好了", tasks: [{ id: 1, title: "完成UI设计", status: "done", assignee: "JOKER" }, { id: 2, title: "React环境搭建", status: "in-progress", assignee: "SKULL" }, { id: 3, title: "API接口对接", status: "todo", assignee: "FOX" }], theme: "bg-white" },
+          { id: "g2", title: "高数每日打卡", course: "Calculus", members: 42, maxMembers: 100, tags: ["学习"], lastMsg: "今日题目已发布", tasks: [], theme: "bg-white" },
+        ];
+
+        const FILES = [
+          { id: 1, name: "高等数学_第一章.pdf", size: "2.4MB", type: "PDF" },
+          { id: 2, name: "项目需求规格说明书.docx", size: "1.1MB", type: "DOC" },
+          { id: 3, name: "课程素材包.zip", size: "15MB", type: "ZIP" },
+        ];
+
+        // --- Core Logic ---
+        const useRouter = (initialPage = "HOME") => {
+          const [history, setHistory] = useState([{ name: initialPage, params: {} }]);
+          const push = (pageName, params = {}) => setHistory((prev) => [...prev, { name: pageName, params }]);
+          const pop = () => setHistory((prev) => (prev.length > 1 ? prev.slice(0, -1) : prev));
+          const reset = (pageName) => setHistory([{ name: pageName, params: {} }]);
+          return { currentPage: history[history.length - 1], push, pop, reset };
+        };
+        
+        const callGemini = async (prompt) => {
+           // Mocking AI response for static deployment
+           return new Promise(resolve => setTimeout(() => resolve(`AI生成的挑战：完成${prompt}的第一章复习`), 1000));
+        };
+
+        // --- Components ---
+        const P5Button = ({ children, onClick, className = "", variant = "primary", disabled = false }) => {
+          const variants = {
+            primary: "bg-blue-600 text-white shadow-[4px_4px_0px_0px_black] hover:bg-yellow-400 hover:text-black",
+            secondary: "bg-white text-black shadow-[4px_4px_0px_0px_black]",
+            accent: "bg-yellow-400 text-black shadow-[4px_4px_0px_0px_black]",
+          };
+          return (
+            <button onClick={onClick} disabled={disabled} className={`group relative px-6 py-3 font-black italic transform -skew-x-6 border-2 border-black transition-all ${disabled ? "opacity-50" : "active:translate-y-1 active:shadow-none"} ${variants[variant]} ${className}`}>
+              <div className="transform skew-x-6 flex items-center justify-center gap-2 uppercase tracking-widest">{children}</div>
+            </button>
+          );
+        };
+
+        const P5Header = ({ title, subtitle, rightAction, onBack }) => (
+          <div className="sticky top-0 z-40 bg-blue-600 text-white border-b-4 border-black px-5 py-4 flex justify-between items-center shadow-md">
+            <div className="flex items-center gap-3">
+              {onBack && <button onClick={onBack} className="bg-white text-black p-1 border-2 border-black hover:bg-yellow-400 transition-colors"><ChevronLeft size={28} strokeWidth={3} /></button>}
+              <div>
+                <h1 className="text-3xl font-black italic tracking-tighter uppercase font-sans leading-none" style={{ textShadow: "2px 2px 0px black" }}>{title}</h1>
+                {subtitle && <p className="text-[10px] font-black bg-yellow-400 text-black px-2 inline-block border border-black transform -skew-x-6 mt-1">{subtitle}</p>}
+              </div>
+            </div>
+            <div>{rightAction}</div>
+          </div>
+        );
+
+        const P5TabBar = ({ activeTab, onSwitchTab }) => {
+          const tabs = [
+            { id: "HOME", label: "首页", icon: BookOpen },
+            { id: "MATCH", label: "匹配", icon: Search },
+            { id: "FOCUS", label: "专注", icon: Zap, isFab: true },
+            { id: "GROUPS", label: "小组", icon: Users },
+            { id: "PROFILE", label: "我的", icon: User },
+          ];
+          return (
+            <div className="fixed bottom-0 left-0 right-0 z-50 pointer-events-none">
+              <div className="absolute bottom-0 w-full h-20 bg-black border-t-4 border-blue-600 pointer-events-auto"></div>
+              <div className="relative flex justify-between items-end px-4 pb-4 h-24 max-w-md mx-auto pointer-events-auto">
+                {tabs.map((tab) => (
+                  <div key={tab.id} className={tab.isFab ? "relative -top-5 mx-2" : "mb-2"}>
+                    <button onClick={() => onSwitchTab(tab.id)} className={`flex flex-col items-center gap-1 transition-all ${tab.isFab ? "w-16 h-16 bg-yellow-400 border-4 border-black transform rotate-45" : activeTab === tab.id ? "text-blue-400 scale-110" : "text-gray-400"}`}>
+                      <tab.icon size={24} className={tab.isFab ? "transform -rotate-45" : ""} strokeWidth={3} />
+                      {!tab.isFab && <span className={`text-[10px] font-black italic uppercase ${activeTab === tab.id ? "bg-white text-blue-600 px-1 transform -skew-x-6" : ""}`}>{tab.label}</span>}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        };
+        
+        const StarBurst = ({ className }) => (
+          <div className={`bg-black text-white flex items-center justify-center ${className}`} style={{ clipPath: "polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)" }}>
+            <div className="w-full h-full bg-yellow-400 scale-75" style={{ clipPath: "inherit" }}></div>
+          </div>
+        );
+
+        // --- Views ---
+        const HomeView = ({ router }) => (
+          <div className="pb-28 bg-gray-100 min-h-screen animate-fade-in">
+            <P5Header title="ACADEMY" subtitle={`USER: ${CURRENT_USER.name}`} rightAction={<button onClick={() => router.push("NOTIFICATIONS")} className="bg-white text-black p-2 border-2 border-black"><Bell size={20} /></button>} />
+            <div className="px-5 mt-6 space-y-8">
+              <div className="relative cursor-pointer" onClick={() => router.push("FOCUS")}>
+                <div className="absolute inset-0 bg-black translate-x-2 translate-y-2"></div>
+                <div className="relative bg-blue-600 p-6 text-white border-2 border-black overflow-hidden">
+                  <h2 className="text-3xl font-black italic uppercase tracking-tighter" style={{ textShadow: "3px 3px 0px black" }}>Seize The<br />Knowledge</h2>
+                  <div className="mt-4 flex justify-between items-center">
+                    <div className="bg-yellow-400 text-black border border-black px-3 py-1 font-bold text-xs transform -skew-x-12">今日专注: 45 MINS</div>
+                    <div className="w-12 h-12 bg-black border-2 border-white rounded-full flex items-center justify-center animate-pulse"><Play size={24} fill="#FACC15" /></div>
+                  </div>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                {[{ icon: Clock, label: "倒数日", p: "COUNTDOWN", c: "bg-white" }, { icon: Target, label: "目标", p: "GOALS", c: "bg-black text-white" }, { icon: MapPin, label: "占座", p: "SEATS", c: "bg-white" }, { icon: FileText, label: "资料", p: "FILES", c: "bg-yellow-400 text-black" }].map((item, i) => (
+                  <div key={i} onClick={() => router.push(item.p)} className={`p-4 border-2 border-black cursor-pointer shadow-[4px_4px_0px_0px_black] transition-all hover:-translate-y-1 ${item.c}`}>
+                    <div className="flex items-center gap-3"><item.icon size={24} strokeWidth={2.5} /><span className="font-black italic text-lg uppercase">{item.label}</span></div>
+                  </div>
+                ))}
+              </div>
+              <div>
+                <div className="flex items-center justify-between mb-4 border-b-4 border-black pb-1"><h3 className="text-2xl font-black italic bg-black text-white px-2">日程表 SCHEDULE</h3></div>
+                <div className="space-y-4">
+                  {COURSES.slice(0, 2).map((c) => (
+                    <div key={c.id} className="flex group cursor-pointer" onClick={() => router.push("COURSE_DETAIL", { course: c })}>
+                      <div className="w-16 pt-2 font-black text-xl italic text-gray-400">{c.time}</div>
+                      <div className={`flex-1 p-4 border-2 border-black shadow-[4px_4px_0px_0px_black] transition-transform group-hover:-translate-y-1 ${c.theme}`}>
+                        <h4 className="font-black text-lg uppercase mb-1">{c.name}</h4>
+                        <span className="text-xs font-bold border border-current px-1">{c.location}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+
+        const MatchView = ({ router }) => {
+          const [filter, setFilter] = useState("全部");
+          const filtered = filter === "全部" ? BUDDY_RECOMMENDATIONS : BUDDY_RECOMMENDATIONS.filter(b => b.category === filter);
+          return (
+            <div className="pb-28 min-h-screen bg-white bg-[radial-gradient(#2563EB_1px,transparent_1px)] [background-size:16px_16px]">
+              <P5Header title="寻找同伴" subtitle="CONFIDANT" rightAction={<Filter size={24} />} />
+              <div className="px-5 mt-6 space-y-6">
+                <div className="flex gap-2 overflow-x-auto pb-2 hide-scrollbar">{["全部", "开发", "设计", "高数", "自习"].map(t => <button key={t} onClick={() => setFilter(t)} className={`px-4 py-1 border-2 border-black font-black italic whitespace-nowrap transition-all ${filter === t ? "bg-blue-600 text-white shadow-[3px_3px_0px_black] -translate-y-1" : "bg-white"}`}>{t}</button>)}</div>
+                {filtered.map((buddy, idx) => (
+                  <div key={buddy.id} onClick={() => router.push("BUDDY_DETAIL", { buddy })} className="relative group cursor-pointer animate-pop">
+                    <div className="absolute inset-0 bg-black translate-x-2 translate-y-2"></div>
+                    <div className={`relative bg-white border-2 border-black transform ${idx % 2 === 0 ? "-rotate-1" : "rotate-1"} group-hover:rotate-0`}>
+                      <div className="bg-black text-white p-2 flex justify-between px-4"><span className="font-black italic uppercase tracking-widest">{buddy.style}</span><span className="text-yellow-400 font-black italic">{buddy.matchScore}%</span></div>
+                      <div className="p-4 flex gap-4"><img src={buddy.avatar} className="w-16 h-16 border-2 border-black object-cover" /><div><h3 className="text-2xl font-black italic text-blue-600 uppercase leading-none mb-1">{buddy.name}</h3><div className="flex gap-1 mb-1"><span className="bg-blue-600 text-white text-[10px] px-1 font-bold">{buddy.major}</span><span className="bg-gray-200 text-black text-[10px] px-1 font-bold">{buddy.freeTime || "有空"}</span></div><p className="text-xs italic line-clamp-1 font-bold">"{buddy.desc}"</p></div></div>
+                      <div className="border-t-2 border-black flex"><button className="flex-1 py-2 font-black uppercase text-sm border-r-2 border-black hover:bg-gray-100">Info</button><button className="flex-1 py-2 font-black bg-yellow-400 uppercase text-sm hover:bg-black hover:text-yellow-400">Connect</button></div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        };
+        
+        const FocusView = ({ router }) => {
+          const [timeLeft, setTimeLeft] = useState(1500);
+          const [active, setActive] = useState(false);
+          useEffect(() => { if(active && timeLeft > 0) { const t = setInterval(() => setTimeLeft(l => l - 1), 1000); return () => clearInterval(t); } }, [active, timeLeft]);
+          return (
+            <div className="h-screen bg-blue-600 flex flex-col items-center justify-center p-6 text-white overflow-hidden relative">
+              <div className="absolute inset-0 flex items-center justify-center opacity-30"><StarBurst className="w-[600px] h-[600px] animate-spin-slow" /></div>
+              <button onClick={router.pop} className="absolute top-6 left-6 z-50 bg-black p-2 border-2 border-white"><X /></button>
+              <div className="relative z-10 bg-black p-8 border-4 border-white transform rotate-1 shadow-[10px_10px_0px_0px_white] text-center">
+                <h2 className="text-4xl font-black italic mb-6">MISSION START</h2>
+                <div className="text-7xl font-black font-mono bg-white text-blue-600 p-2 border-2 border-black mb-8">{Math.floor(timeLeft/60).toString().padStart(2,'0')}:{Math.floor(timeLeft%60).toString().padStart(2,'0')}</div>
+                <button onClick={() => setActive(!active)} className="w-20 h-20 bg-yellow-400 text-black border-4 border-black flex items-center justify-center mx-auto rounded-none transform rotate-45 transition-transform active:scale-95"><div className="transform -rotate-45">{active ? <Pause /> : <Play />}</div></button>
+              </div>
+            </div>
+          );
+        };
+
+        const GroupsListView = ({ router }) => (
+          <div className="pb-28 bg-gray-100 min-h-screen">
+            <P5Header title="学习小组" subtitle="GUILDS" rightAction={<Plus size={28} onClick={() => router.push("CREATE_GROUP")} />} />
+            <div className="px-5 mt-6 space-y-6">
+              {GROUPS.map(g => (
+                <div key={g.id} onClick={() => router.push("GROUP_DETAIL", { group: g })} className="relative cursor-pointer hover:translate-x-1 transition-transform group shadow-[6px_6px_0px_0px_black]">
+                  <div className="bg-white border-2 border-black p-5 relative overflow-hidden"><h2 className="text-2xl font-black italic uppercase">{g.title}</h2><div className="flex gap-2 mt-1 mb-2"><span className="bg-black text-white text-xs px-2 font-bold">{g.course}</span></div><div className="bg-gray-100 p-3 border-l-4 border-black text-xs font-bold italic mt-4 truncate">"{g.lastMsg}"</div></div>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+
+        const ProfileView = ({ router }) => (
+          <div className="pb-28 bg-white min-h-screen">
+            <div className="bg-black text-white pt-12 pb-8 px-6 relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-full h-full border-t-[100px] border-l-[400px] border-t-blue-600 border-l-transparent opacity-50"></div>
+              <div className="relative z-10 flex items-center gap-6"><img src={CURRENT_USER.avatar} className="w-20 h-20 border-4 border-white grayscale contrast-125" /><div><h2 className="text-3xl font-black italic uppercase">{CURRENT_USER.name}</h2><span className="bg-yellow-400 text-black px-2 font-black text-sm border border-black italic">LV. 15 SCHOLAR</span></div></div>
+              <div className="flex gap-4 relative z-10 mt-8">
+                {[{ l: "专注/分", v: "1240" }, { l: "完成任务", v: "15" }, { l: "信誉分", v: "98" }].map((s, i) => (
+                  <div key={i} className="flex-1 bg-white text-black p-3 border-b-4 border-blue-600 text-center shadow-[4px_4px_0px_0px_black]"><div className="text-2xl font-black italic">{s.v}</div><div className="text-[10px] font-bold bg-black text-white px-1 uppercase tracking-widest">{s.l}</div></div>
+                ))}
+              </div>
+            </div>
+            <div className="p-5 grid grid-cols-2 gap-4">
+              {[{ l: "我的课表", i: Clock, p: "SCHEDULE", c: "bg-gray-50" }, { l: "成就勋章", i: Star, p: "GOALS", c: "bg-yellow-400" }, { l: "学习资料", i: FileText, p: "FILES", c: "bg-gray-50" }, { l: "偏好设置", i: Settings, p: null, c: "bg-gray-50" }].map((item, i) => (
+                <button key={i} onClick={() => item.p && router.push(item.p)} className={`${item.c} p-6 border-2 border-black hover:bg-blue-600 hover:text-white transition-all group text-left relative shadow-[4px_4px_0px_0px_black] active:translate-x-1 active:translate-y-1 active:shadow-none`}>
+                  <item.i size={32} strokeWidth={2} className="mb-2 group-hover:scale-110 transition-transform" />
+                  <div className="font-black text-lg italic uppercase">{item.l}</div>
+                  <ArrowRight size={20} className="absolute bottom-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity" />
+                </button>
+              ))}
+            </div>
+          </div>
+        );
+
+        const CountdownView = ({ router }) => (
+          <div className="bg-white min-h-screen animate-fade-in pb-28">
+            <P5Header title="倒数日" subtitle="DEADLINE" onBack={router.pop} rightAction={<Plus size={24} />} />
+            <div className="px-5 mt-6 space-y-6">
+              {[{t:"英语六级", d:45, c:"bg-blue-600"}, {t:"期末考试", d:72, c:"bg-yellow-400"}].map((it, i) => (
+                <div key={i} className={`p-4 border-2 border-black transform shadow-[6px_6px_0px_black] ${it.c}`}>
+                  <h3 className="font-black text-2xl italic uppercase text-white" style={{textShadow:"2px 2px 0 black"}}>{it.t}</h3>
+                  <div className="text-right text-white"><span className="text-6xl font-black font-mono">{it.d}</span> <span className="font-black italic uppercase">Days</span></div>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+        
+        const GoalsView = ({ router }) => {
+          const [goals, setGoals] = useState([{ title: "阅读50本书", progress: 12, total: 50, color: "bg-blue-600" }]);
+          const [showAi, setShowAi] = useState(false);
+          const [input, setInput] = useState("");
+          const [loading, setLoading] = useState(false);
+        
+          const handleGen = async () => {
+            setLoading(true);
+            await callGemini(`为${input}生成任务`);
+            setGoals([{title: input, progress: 0, total: 100, color: "bg-yellow-400"}, ...goals]);
+            setLoading(false); setShowAi(false);
+          };
+        
+          return (
+            <div className="bg-white min-h-screen animate-fade-in relative">
+              <P5Header title="目标挑战" onBack={router.pop} rightAction={<Sparkles size={24} onClick={()=>setShowAi(true)} />} />
+              <div className="px-5 mt-6 space-y-4">
+                {goals.map((g, i) => (
+                  <div key={i} className="border-4 border-black p-4 shadow-[6px_6px_0px_black]">
+                    <div className="flex justify-between items-end mb-2"><h4 className="font-black italic">{g.title}</h4><span>{g.progress}%</span></div>
+                    <div className="h-4 border-2 border-black bg-white overflow-hidden"><div className={`h-full ${g.color}`} style={{width:`${(g.progress/g.total)*100}%`}}></div></div>
+                  </div>
+                ))}
+              </div>
+              {showAi && (
+                <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-5">
+                  <div className="bg-white border-4 border-blue-600 p-6 w-full max-w-sm">
+                    <h3 className="font-black text-xl mb-4 italic uppercase">AI 目标生成</h3>
+                    <input value={input} onChange={e=>setInput(e.target.value)} className="w-full border-2 border-black p-3 mb-4 font-bold" placeholder="输入学习目标..." />
+                    <P5Button className="w-full" onClick={handleGen} disabled={loading}>{loading ? "AI 计算中..." : "生成契约"}</P5Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        };
+        
+        const SeatsView = ({ router }) => (
+          <div className="bg-white min-h-screen animate-fade-in pb-28">
+            <P5Header title="占座热力" onBack={router.pop} />
+            <div className="px-5 mt-6">
+              <div className="grid grid-cols-4 gap-3 border-4 border-black p-4 bg-gray-50 shadow-[8px_8px_0px_black]">{Array.from({length:16}).map((_, i) => <div key={i} className={`aspect-square border-2 border-black flex items-center justify-center font-black ${[1,3,10].includes(i) ? "bg-gray-300" : "bg-white hover:bg-yellow-100"}`}>{[1,3,10].includes(i) ? "X" : i+1}</div>)}</div>
+              <p className="mt-4 text-xs font-bold italic uppercase opacity-60">* 已接入图书馆实时 API 数据</p>
+            </div>
+          </div>
+        );
+        
+        const FilesView = ({ router }) => (
+          <div className="bg-white min-h-screen animate-fade-in pb-28">
+            <P5Header title="共享资料" subtitle="DATA" onBack={router.pop} />
+            <div className="px-5 mt-6 space-y-4">
+              {FILES.map(f => (
+                <div key={f.id} className="bg-white border-2 border-black p-4 flex justify-between items-center shadow-[4px_4px_0px_black]">
+                  <div><h4 className="font-black italic uppercase leading-none">{f.name}</h4><span className="text-[10px] font-bold opacity-50">{f.size}</span></div>
+                  <Download size={20} className="hover:text-blue-600 cursor-pointer" />
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+        
+        const ScheduleView = ({ router }) => (
+          <div className="bg-gray-100 min-h-screen animate-fade-in pb-28">
+            <P5Header title="我的课表" onBack={router.pop} />
+            <div className="px-5 mt-4 space-y-4">
+              {COURSES.map(c => (
+                <div key={c.id} className={`p-4 border-2 border-black ${c.theme} shadow-[4px_4px_0px_0px_rgba(0,0,0,0.1)]`}>
+                  <div className="text-xs font-black uppercase opacity-60 mb-1">{c.day} | {c.time}</div>
+                  <h4 className="text-xl font-black italic">{c.name}</h4>
+                  <div className="text-xs font-bold mt-2"><MapPin size={12} className="inline mr-1" />{c.location}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+        
+        const NotificationsView = ({ router }) => (
+          <div className="bg-white min-h-screen animate-fade-in pb-28">
+            <P5Header title="通知中心" onBack={router.pop} />
+            <div className="px-5 mt-6 space-y-4">
+              {NOTIFICATIONS.map(n => (
+                <div key={n.id} className="border-2 border-black p-4 bg-gray-50 shadow-[4px_4px_0px_black] animate-pop">
+                  <div className="flex justify-between text-[10px] font-black uppercase mb-1"><span>{n.type}</span><span className="opacity-40">{n.time}</span></div>
+                  <h5 className="font-black text-blue-600">{n.title}</h5>
+                  <p className="text-sm font-bold opacity-80">{n.content}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+        
+        const CourseDetailView = ({ router }) => {
+          const { course } = router.currentPage.params || { course: COURSES[0] };
+          return (
+            <div className="bg-white min-h-screen animate-fade-in">
+              <div className={`h-48 ${course.theme} border-b-4 border-black relative flex items-end p-6 overflow-hidden`}><button onClick={router.pop} className="absolute top-4 left-4 bg-white text-black p-1 border-2 border-black z-20"><ChevronLeft /></button><h2 className="text-4xl font-black italic uppercase relative z-10 leading-none" style={{textShadow:"3px 3px 0 black"}}>{course.name}</h2></div>
+              <div className="p-6"><P5Button className="w-full mb-4" onClick={() => router.push("MATCH")}>匹配同学队友</P5Button></div>
+            </div>
+          );
+        };
+        
+        const BuddyDetailView = ({ router }) => {
+          const { buddy } = router.currentPage.params || { buddy: BUDDY_RECOMMENDATIONS[0] };
+          return (
+            <div className="bg-white min-h-screen animate-fade-in">
+              <div className="h-40 bg-black relative"><button onClick={router.pop} className="absolute top-4 left-4 text-white"><ChevronLeft size={32} /></button></div>
+              <div className="px-5 -mt-12 relative z-10"><img src={buddy.avatar} className="w-32 h-32 border-4 border-white bg-black shadow-lg" /><h1 className="text-4xl font-black italic uppercase mt-4">{buddy.name}</h1><p className="bg-gray-100 p-6 border-2 border-black italic font-bold">"{buddy.desc}"</p><P5Button className="w-full mt-8">发送作战邀请</P5Button></div>
+            </div>
+          );
+        };
+        
+        const GroupDetailView = ({ router }) => {
+          const { group } = router.currentPage.params || { group: GROUPS[0] };
+          return (
+            <div className="bg-gray-100 min-h-screen animate-fade-in pb-28">
+              <P5Header title={group.title} subtitle={group.course} onBack={router.pop} />
+              <div className="px-5 mt-6 space-y-6"><div className="bg-white border-2 border-black p-4 shadow-[4px_4px_0px_0px_black]"><h3 className="font-black italic mb-2">KANBAN</h3>{group.tasks.map(t => <div key={t.id} className="flex items-center gap-2 border-b py-2"><CheckSquare size={16} /> <span className={t.status === "done" ? "line-through text-gray-400" : "font-bold"}>{t.title}</span></div>)}</div><P5Button className="w-full">进入加密群聊</P5Button></div>
+            </div>
+          );
+        };
+        
+        const CreateGroupView = ({ router }) => (
+          <div className="bg-white min-h-screen animate-fade-in pb-28">
+            <P5Header title="新建小组" onBack={router.pop} />
+            <div className="px-5 mt-8 space-y-6"><input className="w-full border-2 border-black p-4 font-bold transform -skew-x-6 outline-none focus:bg-yellow-50 focus:shadow-[4px_4px_0px_black] transition-all" placeholder="输入名称..." /><P5Button className="w-full py-4 text-xl mt-4" onClick={() => router.pop()}>成立契约</P5Button></div>
+          </div>
+        );
+        
+        const ChatDetailView = ({ router }) => {
+            const { chat } = router.currentPage.params || { chat: CHATS[0] };
+            const [inputValue, setInputValue] = useState("");
+            const [isGenerating, setIsGenerating] = useState(false);
+          
+            const handleAiIcebreaker = async () => {
+              setIsGenerating(true);
+              const text = await callGemini(`为${chat.name}写一句开场白`);
+              setInputValue(text);
+              setIsGenerating(false);
+            };
+          
+            return (
+              <div className="bg-white min-h-screen flex flex-col">
+                <P5Header title={chat.name} onBack={router.pop} />
+                <div className="flex-1 p-5 space-y-6 overflow-y-auto bg-[url('https://www.transparenttextures.com/patterns/diagmonds-light.png')]">
+                   {/* Messages would go here */}
+                   <div className="text-center text-gray-400 italic font-bold mt-10">Chat Start</div>
+                </div>
+                <div className="p-4 bg-blue-600 border-t-4 border-black flex gap-2 items-center">
+                  <button onClick={handleAiIcebreaker} disabled={isGenerating} className="bg-yellow-400 border-2 border-black p-2 shadow-[2px_2px_0px_0px_black]">{isGenerating ? <Loader2 className="animate-spin" /> : <Sparkles />}</button>
+                  <input value={inputValue} onChange={(e) => setInputValue(e.target.value)} className="flex-1 bg-white border-2 border-black px-4 py-3 font-bold uppercase outline-none focus:shadow-[4px_4px_0px_0px_black]" placeholder="TYPE..." />
+                  <button className="bg-black text-white px-6 font-black italic border-2 border-white hover:bg-white hover:text-black">SEND</button>
+                </div>
+              </div>
+            );
+        };
+        
+        const MessageListView = ({ router }) => (
+            <div className="bg-white min-h-screen animate-fade-in pb-28">
+              <P5Header title="消息" subtitle="MESSAGES" onBack={router.pop} />
+              <div className="p-0">
+                {CHATS.map((chat, i) => (
+                  <div key={chat.id} onClick={() => router.push("CHAT_DETAIL", { chat })} className="p-5 border-b-2 border-black flex gap-4 hover:bg-blue-600 hover:text-white group cursor-pointer transition-colors">
+                    <div className="relative"><img src={chat.avatar} className="w-14 h-14 border-2 border-black grayscale group-hover:grayscale-0" />{chat.unread > 0 && <div className="absolute -top-1 -right-1 w-5 h-5 bg-blue-600 group-hover:bg-white group-hover:text-blue-600 text-white flex items-center justify-center font-bold text-xs border border-black rounded-full">{chat.unread}</div>}</div>
+                    <div className="flex-1"><div className="flex justify-between items-baseline mb-1"><h4 className="text-2xl font-black italic uppercase">{chat.name}</h4><span className="text-xs font-bold opacity-60">{chat.time}</span></div><p className="font-bold text-sm opacity-80 line-clamp-1">"{chat.lastMsg}"</p></div>
+                  </div>
+                ))}
+              </div>
+            </div>
+        );
+
+        // --- Main App ---
+        const App = () => {
+          const router = useRouter("HOME");
+          const handleSwitchTab = (id) => { if (id === "FOCUS") router.push("FOCUS"); else router.reset(id); };
+        
+          const renderPage = () => {
+            const { name } = router.currentPage;
+            const pageMap = {
+              HOME: <HomeView router={router} />, MATCH: <MatchView router={router} />,
+              GROUPS: <GroupsListView router={router} />, PROFILE: <ProfileView router={router} />,
+              FOCUS: <FocusView router={router} />, COUNTDOWN: <CountdownView router={router} />,
+              GOALS: <GoalsView router={router} />, SEATS: <SeatsView router={router} />,
+              FILES: <FilesView router={router} />, NOTIFICATIONS: <NotificationsView router={router} />,
+              SCHEDULE: <ScheduleView router={router} />, COURSE_DETAIL: <CourseDetailView router={router} />,
+              BUDDY_DETAIL: <BuddyDetailView router={router} />, GROUP_DETAIL: <GroupDetailView router={router} />,
+              CREATE_GROUP: <CreateGroupView router={router} />, CHAT_DETAIL: <ChatDetailView router={router} />,
+              MESSAGES: <MessageListView router={router} /> // Added message list route
+            };
+            return pageMap[name] || <HomeView router={router} />;
+          };
+        
+          return (
+            <div className="font-sans bg-slate-900 h-screen flex justify-center selection:bg-blue-600 selection:text-white">
+              <div className="w-full max-w-md bg-white h-full shadow-2xl relative overflow-hidden flex flex-col border-x-4 border-black">
+                <div className="flex-1 overflow-y-auto hide-scrollbar scroll-smooth">{renderPage()}</div>
+                {["HOME", "MATCH", "GROUPS", "PROFILE"].includes(router.currentPage.name) && (
+                  <P5TabBar activeTab={router.currentPage.name} onSwitchTab={handleSwitchTab} />
+                )}
+              </div>
+              <style>{`
+                .hide-scrollbar::-webkit-scrollbar { display: none; }
+                .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+                .animate-spin-slow { animation: spin 15s linear infinite; }
+                .animate-pop { animation: pop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+                .animate-fade-in { animation: fadeIn 0.3s ease-out; }
+                .diagonal-lines { background-image: repeating-linear-gradient(45deg, transparent, transparent 5px, rgba(0,0,0,0.1) 5px, rgba(0,0,0,0.1) 10px); }
+                @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+                @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+                @keyframes pop { 0% { transform: scale(0.9); } 100% { transform: scale(1); } }
+              `}</style>
+            </div>
+          );
+        }
+
+        const root = createRoot(document.getElementById("root"));
+        root.render(<App />);
